@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Add product{% endblock %}
+{% block content %}
+{% if errors %}
+<div class="alert alert-danger"><ul class="mb-0">
+{% for error in errors %}<li>{{ error }}</li>{% endfor %}
+</ul></div>
+{% endif %}
+<form method="post" class="card card-body" style="max-width: 36rem">
+<label class="form-label">Name</label><input class="form-control mb-3" name="name" value="{{ form.name }}">
+<label class="form-label">Description</label><input class="form-control mb-3" name="description" value="{{ form.description }}">
+<label class="form-label">Price</label><input class="form-control mb-3" name="price" value="{{ form.price }}">
+<button class="btn btn-primary">Add product</button></form>
+{% endblock %}

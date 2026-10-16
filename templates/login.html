@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+{% if failed %}
+<div class="alert alert-danger">Wrong username or password.</div>
+{% endif %}
+<form method="post" class="card card-body" style="max-width: 28rem">
+<label class="form-label">Username</label><input class="form-control mb-3" name="username">
+<label class="form-label">Password</label><input class="form-control mb-3" type="password" name="password">
+<button class="btn btn-primary">Log in</button></form>
+{% endblock %}

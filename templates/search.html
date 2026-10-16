@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+{% block content %}
+{% if error %}
+<div class="alert alert-danger">Sorry, search is not working right now. Please try again later.</div>
+{% else %}
+<p>Search results for <strong>{{ term }}</strong></p>
+<div class="row g-3">{% include "_product_cards.html" %}</div>
+{% endif %}
+{% endblock %}

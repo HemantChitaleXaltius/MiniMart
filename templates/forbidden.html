@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Not allowed{% endblock %}
+{% block content %}
+<div class="alert alert-danger">You do not have permission to view this page.</div>
+<a class="btn btn-primary" href="{{ url_for('home') }}">Back to the shop</a>
+{% endblock %}
