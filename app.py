@@ -4,6 +4,8 @@ This application is deliberately flawed for a code-review exercise.
 Do not use it as a production example.
 """
 
+## a comment by Hemant
+
 import sqlite3
 
 import logging
