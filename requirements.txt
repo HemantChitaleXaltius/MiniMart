@@ -1,1 +1,4 @@
-Flask>=3.0,<4.0
+# What MiniMart needs to run. These are the versions the tests passed with.
+Flask==3.1.3
+Werkzeug==3.1.8
+python-dotenv==1.2.3

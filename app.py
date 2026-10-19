@@ -1,11 +1,8 @@
 """MiniMart Day 1 starter.
 
-This application is deliberately flawed for a code-review exercise.
+This application is being updated by vibe coding
 Do not use it as a production example.
 """
-
-## a comment by Hemant
-### added a small change
 
 import sqlite3
 
@@ -15,30 +12,18 @@ import math
 
 import config
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, current_app, redirect, render_template, request, session, url_for
 
 from werkzeug.security import check_password_hash
 
 from functools import wraps
 
-import os
-from dotenv import load_dotenv
 
-app = Flask(__name__)
-
-app.secret_key = config.SECRET_KEY
-DATABASE = config.DATABASE_PATH
-
-logging.basicConfig(
-    filename=os.environ.get("LOG_FILE", "minimart.log"),
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
 logger = logging.getLogger("minimart")
 
 
 def get_db():
-    connection = sqlite3.connect(DATABASE)
+    connection = sqlite3.connect(current_app.config["DATABASE"])
     connection.row_factory = sqlite3.Row
     return connection
 
@@ -94,132 +79,145 @@ def init_db():
         raise
 
 
-@app.route("/")
-def home():
-    connection = get_db()
-    products = connection.execute("SELECT * FROM products ORDER BY id").fetchall()
-    connection.close()
-    return render_template("home.html", products=products)
+def create_app(test_config=None):
+    settings = config.load_settings(test_config)
 
-@app.route("/search")
-def search():
-    term = request.args.get("q", "")
-    products = []
-    try:
+    app = Flask(__name__)
+    app.secret_key = settings["SECRET_KEY"]
+    app.config["DATABASE"] = settings["DATABASE"]
+    app.config["DEBUG"] = settings["DEBUG"]
+
+    if settings["LOG_FILE"]:
+        logging.basicConfig(
+            filename=settings["LOG_FILE"],
+            level=logging.INFO,
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        )
+
+    @app.route("/")
+    def home():
         connection = get_db()
-        query = "SELECT * FROM products WHERE name LIKE ?"
-        products = connection.execute(query, (f"%{term}%",)).fetchall()
+        products = connection.execute("SELECT * FROM products ORDER BY id").fetchall()
         connection.close()
-    except Exception:
-        logger.exception("Search failed for term %r", term)
-        return render_template("search.html", term=term, products=[], error=True), 500
-    return render_template("search.html", term=term, products=products, error=False)
+        return render_template("home.html", products=products)
 
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    failed = False
-    if request.method == "POST":
-        username = request.form.get("username", "")
-        password = request.form.get("password", "")
-        connection = get_db()
-        query = "SELECT username, password_hash, role FROM users WHERE username = ?"
-        user = connection.execute(query, (username,)).fetchone()
-        connection.close()
-        if user and check_password_hash(user["password_hash"], password):
-            session["username"] = user["username"]
-            session["role"] = user["role"]
-            return redirect(url_for("home"))
-        failed = True
-    return render_template("login.html", failed=failed)
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("home"))
-
-
-@app.post("/cart/add/<int:product_id>")
-def add_to_cart(product_id):
-    cart_items = session.get("cart", [])
-    cart_items.append(product_id)
-    session["cart"] = cart_items
-    return redirect(request.referrer or url_for("home"))
-
-
-@app.route("/cart")
-def cart():
-    ids = session.get("cart", [])
-    products = []
-    if ids:
-        connection = get_db()
-        placeholders = ",".join("?" for _ in ids)
-        products = connection.execute(
-            f"SELECT * FROM products WHERE id IN ({placeholders})", ids
-        ).fetchall()
-        connection.close()
-    total = sum(product["price"] for product in products)
-    return render_template("cart.html", products=products, total=total)
-
-
-@app.route("/checkout", methods=["GET", "POST"])
-@login_required
-def checkout():
-    count = len(session.get("cart", []))
-    if request.method == "POST":
-        session["cart"] = []
-        return render_template("order_placed.html", count=count)
-    return render_template("checkout.html", count=count)
-
-@app.route("/admin")
-@admin_required
-def admin():
-    connection = get_db()
-    products = connection.execute("SELECT * FROM products ORDER BY id").fetchall()
-    connection.close()
-    return render_template("admin.html", products=products)
-
-
-@app.route("/admin/add", methods=["GET", "POST"])
-@admin_required
-def admin_add():
-    errors = []
-    form = {"name": "", "description": "", "price": ""}
-    if request.method == "POST":
-        form["name"] = request.form.get("name", "").strip()
-        form["description"] = request.form.get("description", "").strip()
-        form["price"] = request.form.get("price", "").strip()
-
-        if not form["name"]:
-            errors.append("Name is required.")
-        elif len(form["name"]) > 100:
-            errors.append("Name must be 100 characters or fewer.")
-        if len(form["description"]) > 500:
-            errors.append("Description must be 500 characters or fewer.")
-
-        price = None
+    @app.route("/search")
+    def search():
+        term = request.args.get("q", "")
+        products = []
         try:
-            price = float(form["price"])
-        except ValueError:
-            errors.append("Price must be a number, for example 4.50.")
-        else:
-            if not math.isfinite(price) or price <= 0 or price > 100000:
-                errors.append("Price must be more than 0 and no more than 100000.")
-
-        if not errors:
             connection = get_db()
-            connection.execute(
-                "INSERT INTO products (name, description, price) VALUES (?, ?, ?)",
-                (form["name"], form["description"], round(price, 2)),
-            )
-            connection.commit()
+            query = "SELECT * FROM products WHERE name LIKE ?"
+            products = connection.execute(query, (f"%{term}%",)).fetchall()
             connection.close()
-            return redirect(url_for("admin"))
-        return render_template("admin_add.html", errors=errors, form=form), 400
-    return render_template("admin_add.html", errors=errors, form=form)
+        except Exception:
+            logger.exception("Search failed for term %r", term)
+            return render_template("search.html", term=term, products=[], error=True), 500
+        return render_template("search.html", term=term, products=products, error=False)
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        failed = False
+        if request.method == "POST":
+            username = request.form.get("username", "")
+            password = request.form.get("password", "")
+            connection = get_db()
+            query = "SELECT username, password_hash, role FROM users WHERE username = ?"
+            user = connection.execute(query, (username,)).fetchone()
+            connection.close()
+            if user and check_password_hash(user["password_hash"], password):
+                session["username"] = user["username"]
+                session["role"] = user["role"]
+                return redirect(url_for("home"))
+            failed = True
+        return render_template("login.html", failed=failed)
+
+    @app.route("/logout")
+    def logout():
+        session.clear()
+        return redirect(url_for("home"))
+
+    @app.post("/cart/add/<int:product_id>")
+    def add_to_cart(product_id):
+        cart_items = session.get("cart", [])
+        cart_items.append(product_id)
+        session["cart"] = cart_items
+        return redirect(request.referrer or url_for("home"))
+
+    @app.route("/cart")
+    def cart():
+        ids = session.get("cart", [])
+        products = []
+        if ids:
+            connection = get_db()
+            placeholders = ",".join("?" for _ in ids)
+            products = connection.execute(
+                f"SELECT * FROM products WHERE id IN ({placeholders})", ids
+            ).fetchall()
+            connection.close()
+        total = sum(product["price"] for product in products)
+        return render_template("cart.html", products=products, total=total)
+
+    @app.route("/checkout", methods=["GET", "POST"])
+    @login_required
+    def checkout():
+        count = len(session.get("cart", []))
+        if request.method == "POST":
+            session["cart"] = []
+            return render_template("order_placed.html", count=count)
+        return render_template("checkout.html", count=count)
+
+    @app.route("/admin")
+    @admin_required
+    def admin():
+        connection = get_db()
+        products = connection.execute("SELECT * FROM products ORDER BY id").fetchall()
+        connection.close()
+        return render_template("admin.html", products=products)
+
+    @app.route("/admin/add", methods=["GET", "POST"])
+    @admin_required
+    def admin_add():
+        errors = []
+        form = {"name": "", "description": "", "price": ""}
+        if request.method == "POST":
+            form["name"] = request.form.get("name", "").strip()
+            form["description"] = request.form.get("description", "").strip()
+            form["price"] = request.form.get("price", "").strip()
+
+            if not form["name"]:
+                errors.append("Name is required.")
+            elif len(form["name"]) > 100:
+                errors.append("Name must be 100 characters or fewer.")
+            if len(form["description"]) > 500:
+                errors.append("Description must be 500 characters or fewer.")
+
+            price = None
+            try:
+                price = float(form["price"])
+            except ValueError:
+                errors.append("Price must be a number, for example 4.50.")
+            else:
+                if not math.isfinite(price) or price <= 0 or price > 100000:
+                    errors.append("Price must be more than 0 and no more than 100000.")
+
+            if not errors:
+                connection = get_db()
+                connection.execute(
+                    "INSERT INTO products (name, description, price) VALUES (?, ?, ?)",
+                    (form["name"], form["description"], round(price, 2)),
+                )
+                connection.commit()
+                connection.close()
+                return redirect(url_for("admin"))
+            return render_template("admin_add.html", errors=errors, form=form), 400
+        return render_template("admin_add.html", errors=errors, form=form)
+
+    return app
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
+    app = create_app()
+    with app.app_context():
+        init_db()
+    app.run(debug=app.config["DEBUG"])

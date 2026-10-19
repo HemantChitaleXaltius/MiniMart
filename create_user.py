@@ -1,11 +1,13 @@
 """Create a user with a hashed password. Run: python create_user.py"""
 
 import sqlite3
+import config
+
 from getpass import getpass
 
 from werkzeug.security import generate_password_hash
 
-DATABASE = os.environ.get("DATABASE_PATH", "minimart.db")
+DATABASE = config.DATABASE_PATH
 
 username = input("Username: ").strip()
 role = input("Role (admin or shopper): ").strip()

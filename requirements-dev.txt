@@ -1,0 +1,3 @@
+# Extra tools for developing and testing. Do not install these on a live server.
+-r requirements.txt
+pytest==9.1.1

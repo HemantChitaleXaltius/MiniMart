@@ -2,9 +2,11 @@
 
 import sqlite3
 
+import config
+
 from werkzeug.security import generate_password_hash
 
-DATABASE = os.environ.get("DATABASE_PATH", "minimart.db")
+DATABASE = config.DATABASE_PATH
 
 connection = sqlite3.connect(DATABASE)
 connection.row_factory = sqlite3.Row
