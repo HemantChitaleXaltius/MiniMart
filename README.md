@@ -1,6 +1,6 @@
-# MiniMart - Activity 1 Starter
+# MiniMart - Completed
 
-This is the deliberately flawed prototype for **Lab 1: Code Review Clinic**.
+This is the updated prototype for **Lab 1: Code Review Clinic**.
 
 ## Run it
 
