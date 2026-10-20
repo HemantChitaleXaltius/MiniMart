@@ -17,6 +17,8 @@ BASE_DIR = Path(__file__).resolve().parent
 
 MIN_SECRET_LENGTH = 32
 
+LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
 
 def _fail(message):
     # SystemExit with a string prints just that message and stops the app,
@@ -47,6 +49,13 @@ def _checked_secret_key(value):
     return value
 
 
+def _checked_log_level(value):
+    level = str(value or "").strip().upper() or "INFO"
+    if level not in LOG_LEVELS:
+        _fail(f"LOG_LEVEL is {value!r}, but it must be one of: {', '.join(LOG_LEVELS)}.")
+    return level
+
+
 def database_path():
     """Where the database file is. The helper scripts use this: they need no secret key."""
     load_dotenv(BASE_DIR / ".env")
@@ -59,14 +68,15 @@ def load_settings(overrides=None):
     With no overrides, values come from the environment and the .env file.
     Tests pass overrides instead: then neither the environment nor .env is read,
     so a test can never pick up your real key, database or log file.
-    Overrides must include SECRET_KEY and DATABASE. LOG_FILE (default: none)
-    and DEBUG (default: False) are optional.
+    Overrides must include SECRET_KEY and DATABASE. LOG_FILE (default: none),
+    LOG_LEVEL (default: INFO) and DEBUG (default: False) are optional.
     """
     if overrides is None:
         load_dotenv(BASE_DIR / ".env")
         secret_key = os.environ.get("SECRET_KEY", "").strip()
         database = _path("DATABASE_PATH", "minimart.db")
-        log_file = _path("LOG_FILE", "minimart.log")
+        log_file = _path("LOG_FILE", "logs/minimart.log")
+        log_level = os.environ.get("LOG_LEVEL", "")
         # Debug mode is off unless FLASK_DEBUG is explicitly 1, true or yes.
         debug = os.environ.get("FLASK_DEBUG", "").strip().lower() in ("1", "true", "yes")
     else:
@@ -75,11 +85,13 @@ def load_settings(overrides=None):
         if not database:
             _fail("the test settings must include DATABASE, a path to a throwaway database file.")
         log_file = overrides.get("LOG_FILE")
+        log_level = overrides.get("LOG_LEVEL", "")
         debug = bool(overrides.get("DEBUG", False))
 
     return {
         "SECRET_KEY": _checked_secret_key(secret_key),
         "DATABASE": str(database),
         "LOG_FILE": log_file,
+        "LOG_LEVEL": _checked_log_level(log_level),
         "DEBUG": debug,
     }

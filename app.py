@@ -21,6 +21,74 @@ from functools import wraps
 
 logger = logging.getLogger("minimart")
 
+LOG_FORMAT = (
+    "%(asctime)s %(levelname)-8s %(name)s "
+    "[req=%(request_id)s user=%(user)s ip=%(ip)s %(method)s %(path)s] %(message)s"
+)
+LOG_HANDLER_MARK = "_minimart_handler"
+
+
+def _one_line(value, limit):
+    """Make text safe for one log line: no line breaks or control characters, and not too long."""
+    return "".join(ch if ch.isprintable() else "?" for ch in str(value))[:limit]
+
+
+class RequestContextFilter(logging.Filter):
+    """Adds who and what to every log line, from the web request being handled.
+
+    It reads only five things: a random request id, the username in the session,
+    the caller's address, the HTTP method and the page path. It never touches
+    the form, the query string (where search words are), the headers or the
+    cookie, so a password, hash or session cookie cannot end up in a log line.
+    """
+
+    def filter(self, record):
+        record.request_id = record.user = record.ip = record.method = record.path = "-"
+        if has_request_context():
+            record.request_id = g.get("request_id", "-")
+            record.user = _one_line(session.get("username", "-"), 50)
+            record.ip = _one_line(request.remote_addr or "-", 45)
+            record.method = _one_line(request.method, 10)
+            record.path = _one_line(request.path, 100)
+        return True
+
+
+def configure_logging(app, level_name="INFO", log_file=None):
+    level = getattr(logging, level_name)  # config.py has already checked the name
+    formatter = logging.Formatter(LOG_FORMAT)
+
+    handlers = [logging.StreamHandler()]  # the console (stderr)
+    if log_file:
+        try:
+            Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+            handlers.append(
+                logging.handlers.RotatingFileHandler(
+                    log_file, maxBytes=1_000_000, backupCount=5, encoding="utf-8"
+                )
+            )
+        except OSError as error:
+            raise SystemExit(f"MiniMart cannot start: cannot write the log file {log_file}: {error}")
+
+    for handler in handlers:
+        handler.setFormatter(formatter)
+        handler.addFilter(RequestContextFilter())
+        setattr(handler, LOG_HANDLER_MARK, True)
+
+    app.logger.removeHandler(default_handler)  # Flask's own console handler would duplicate ours
+    for target in (logger, app.logger):
+        for old in [h for h in target.handlers if getattr(h, LOG_HANDLER_MARK, False)]:
+            target.removeHandler(old)
+            old.close()
+        for handler in handlers:
+            target.addHandler(handler)
+        target.setLevel(level)
+
+    @app.before_request
+    def give_this_request_an_id():
+        g.request_id = secrets.token_hex(4)
+
+    logger.info("Logging started: level=%s file=%s", level_name, log_file or "none (console only)")
+
 
 def get_db():
     connection = sqlite3.connect(current_app.config["DATABASE"])
